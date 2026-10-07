@@ -11,6 +11,13 @@ Book
 - title
 - authir
 - total_pages
+- number_of_copies
+
+BookCopy
+- copy_id
+- book_id
+- condition
+- status
 
 Review
 - review_id
