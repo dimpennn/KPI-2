@@ -1,29 +1,29 @@
-## Context and Problem Statement
+## Контекст та визначення проблеми
 
 
 
-## Decision Drivers
+## Рушії рішення
 
 * <!-- decision driver -->
 
-## Considered Options
+## Можливі рішення
 
 * <!-- option -->
 
-## Decision Outcome
+## Результат рішення
 
 Chosen option: "", because
 
-### Consequences
+### Наслідки
 
 * Good, because
 * Bad, because
 
-### Confirmation
+### Підтвердження
 
 
 
-## Pros and Cons of the Options
+## Плюси та мінуси варіантів
 
 ### <!-- title of option -->
 
@@ -31,4 +31,4 @@ Chosen option: "", because
 * Neutral, because
 * Bad, because
 
-## More Information
+## Більше інформації
