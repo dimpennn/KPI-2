@@ -1,43 +1,43 @@
 Сутності та атрибути
 
 User
-- user_id: UUIDv7
+- user_id: UUIDv7 (PK)
 - fullName: string
 - email: string
 - registered_at: timestamp
 
 Book
-- book_id: UUIDv7
+- book_id: UUIDv7 (PK)
 - title: string
 - authir: string
 - total_pages: number
 - number_of_copies: number
 
 BookCopy
-- copy_id: UUIDv7
-- book_id: UUIDv7
+- copy_id: UUIDv7 (PK)
+- book_id: UUIDv7 (FK)
 - condition: BookCopyCondition
 - status: BookCopyStatus
 
 Review
-- review_id: UUIDv7
-- user_id: UUIDv7
-- book_id: UUIDv7
+- review_id: UUIDv7 (PK)
+- user_id: UUIDv7 (FK)
+- book_id: UUIDv7 (FK)
 - rating: number
 - comment: string
 - created_at: timestamp
 
 Receipt: 
-- receipt_id: UUIDv7
-- user_id: UUIDv7
-- book_id: UUIDv7
+- receipt_id: UUIDv7 (PK)
+- user_id: UUIDv7 (FK)
+- book_id: UUIDv7 (FK)
 - borrowed_at: timestamp
 - due_date: timestamp
 
 Reservation
-- reservation_id: UUIDv7
-- user_id: UUIDv7
-- book_id: UUIDv7
+- reservation_id: UUIDv7 (PK)
+- user_id: UUIDv7 (FK)
+- book_id: UUIDv7 (FK)
 - reserved_at: timestamp
 - expires_at: timestamp
 - status: ReservationStatus
