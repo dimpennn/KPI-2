@@ -1,0 +1,57 @@
+erDiagram
+    User ||--o{ Reservation : "створює"
+    User ||--o{ Receipt : "отримує"
+    User ||--o{ Review : "пише"
+
+    Book ||--o{ BookCopy : "складається з"
+    Book ||--o{ Reservation : "запрошується в"
+    Book ||--o{ Review : "отримує"
+
+    BookCopy ||--o{ Receipt : "видається через"
+
+    User {
+        UUIDv7 user_id PK
+        string fullName
+        string email
+        timestamp registered_at
+    }
+
+    Book {
+        UUIDv7 book_id PK
+        string title
+        string author
+        number total_pages
+    }
+
+    BookCopy {
+        UUIDv7 copy_id PK
+        UUIDv7 book_id FK
+        BookCopyCondition book_copy_condition
+        CopyStatus book_copy_status
+    }
+
+    Review {
+        UUIDv7 review_id PK
+        UUIDv7 user_id FK
+        UUIDv7 book_id FK
+        number rating
+        string comment
+        timestamp created_at
+    }
+
+    Receipt {
+        UUIDv7 receipt_id PK
+        UUIDv7 user_id FK
+        UUIDv7 copy_id FK
+        timestamp borrowed_at
+        timestamp due_date
+    }
+
+    Reservation {
+        UUIDv7 reservation_id PK
+        UUIDv7 user_id FK
+        UUIDv7 book_id FK
+        timestamp reserved_at
+        timestamp expires_at
+        ReservationStatus reservation_status
+    }
