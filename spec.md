@@ -11,7 +11,6 @@ Book
 - title: string
 - authir: string
 - total_pages: number
-- number_of_copies: number
 
 BookCopy
 - copy_id: UUIDv7 (PK)
