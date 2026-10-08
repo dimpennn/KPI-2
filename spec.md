@@ -50,7 +50,7 @@ BookCopyCondition:
 - "WORN" - помітні пошкодження;
 - "DAMAGED" - пошкоджений (потребує ремонту або списання).
 
-CopyStatus:
+BookCopyStatus:
 - "AVAILABLE" - на полиці;
 - "RESERVED" - заброньований;
 - "IN_USE" - виданий читачеві;
