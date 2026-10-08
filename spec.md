@@ -30,7 +30,7 @@ Review
 Receipt: 
 - receipt_id: UUIDv7 (PK)
 - user_id: UUIDv7 (FK)
-- book_id: UUIDv7 (FK)
+- copy_id: UUIDv7 (FK)
 - borrowed_at: timestamp
 - due_date: timestamp
 
