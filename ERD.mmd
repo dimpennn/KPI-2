@@ -1,4 +1,14 @@
 erDiagram
+    User ||--o{ Reservation : "створює"
+    User ||--o{ Receipt : "отримує"
+    User ||--o{ Review : "пише"
+
+    Book ||--|{ BookCopy : "складається з"
+    Book ||--o{ Reservation : "запрошується в"
+    Book ||--o{ Review : "отримує"
+
+    BookCopy ||--o{ Receipt : "видається через"
+
     User {
         UUIDv7 user_id PK
         string fullName
