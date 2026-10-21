@@ -10,6 +10,9 @@ package "DimPenShelf" {
   actor "Служба доставки" as Delivery
   actor "Платіжна система" as Payment
 
+  ''' Author успадковує всі права та можливості Читача '''
+  Author -|> Reader
+
   usecase "Перегляд каталогу книг" as UC1
   usecase "Бронювання книги" as UC2
   usecase "Оплата оренди книги" as UC3
