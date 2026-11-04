@@ -5,12 +5,11 @@ left to right direction
 
 package "DimPenShelf" {
 
-  actor "Читач" as Reader
-  actor "Автор" as Author
-  actor "Служба доставки" as Delivery
-  actor "Платіжна система" as Payment
+  actor "Reader" as Reader
+  actor "Author" as Author
+  actor "Librarian" as Librarian
 
-  ''' Author успадковує всі права та можливості Читача '''
+  ''' Author успадковує всі права Читача '''
   Author -|> Reader
 
   usecase "Перегляд каталогу книг" as UC1
@@ -19,15 +18,9 @@ package "DimPenShelf" {
   usecase "Оформлення доставки" as UC4
   usecase "Отримання примірника" as UC5
   usecase "Залишити відгук / оцінку" as UC6
-  usecase "Додавання книги" as UC7
-  usecase "Перегляд статистики читань" as UC8
+  usecase "Додавання книги та статистика читань" as UC7
 
-  usecase "Авторизація оплати" as ExtPayAuth <<extend>>
-  usecase "Повернення коштів" as ExtPayRefund <<extend>>
-  usecase "Обчислення ціни та терміну доставки" as ExtDelCalc <<extend>>
-  usecase "Генерація накладної" as ExtDelInvoice <<extend>>
-
-  ''' Базові прецеденти Читача '''
+  ''' Читач '''
   Reader --> UC1
   Reader --> UC2
   Reader --> UC3
@@ -35,22 +28,11 @@ package "DimPenShelf" {
   Reader --> UC5
   Reader --> UC6
 
-  ''' Прецеденти Autorа '''
+  ''' Автор '''
   Author --> UC7
-  Author --> UC8
 
-  ''' Взовнішні системи '''
-  Payment --> UC3
-  Delivery --> UC4
-
-  ''' Include — обов'язкові підпроцеси '''
-  UC3 ..> ExtPayAuth : include
-  UC4 ..> ExtDelCalc : include
-  UC4 ..> ExtDelInvoice : include
-
-  ''' Extend — додаткова / умовна поведінка '''
-  UC3 ..> ExtPayRefund : extend
-  UC2 ..> UC4 : extend
+  ''' Бібліотекар видає примірник '''
+  Librarian --> UC5
 }
 
 @enduml
