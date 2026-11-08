@@ -1,38 +1,45 @@
-@startuml
+﻿@startuml
 skinparam monochrome true
 skinparam shadowing false
 left to right direction
 
-package "DimPenShelf" {
+actor "Читач" as Reader
+actor "Автор" as Author
+actor "Служба доставки" as DeliveryService
 
-  actor "Reader" as Reader
-  actor "Author" as Author
-  actor "Librarian" as Librarian
+' Автор успадковує всі права Читача
+Author -|> Reader
 
-  ''' Author успадковує всі права Читача '''
-  Author -|> Reader
+rectangle "DimPenShelf" {
+  usecase "UC-01: Перегляд каталогу книг" as UC1
+  usecase "UC-02: Бронювання книги" as UC2
+  usecase "UC-03: Оплата оренди книги" as UC3
+  usecase "UC-04: Оформлення та відстеження доставки" as UC4
+  usecase "UC-05: Отримання примірника" as UC5
+  usecase "UC-06: Залишити відгук / оцінку" as UC6
+  usecase "UC-07: Додавання книги та статистика читань" as UC7
+  usecase "Повернення коштів при скасуванні" as ExtPayRefund
 
-  usecase "Перегляд каталогу книг" as UC1
-  usecase "Бронювання книги" as UC2
-  usecase "Оплата оренди книги" as UC3
-  usecase "Оформлення доставки" as UC4
-  usecase "Отримання примірника" as UC5
-  usecase "Залишити відгук / оцінку" as UC6
-  usecase "Додавання книги та статистика читань" as UC7
+  ' Обов'язкове включення: отримання примірника вимагає оплати оренди
+  UC5 ..> UC3 : <<include>>
 
-  ''' Читач '''
-  Reader --> UC1
-  Reader --> UC2
-  Reader --> UC3
-  Reader --> UC4
-  Reader --> UC5
-  Reader --> UC6
-
-  ''' Автор '''
-  Author --> UC7
-
-  ''' Бібліотекар видає примірник '''
-  Librarian --> UC5
+  ' Опціональні/умовні розширення (стрілка ВІД розширення ДО базового прецедента)
+  UC4 ..> UC2 : <<extend>>
+  ExtPayRefund ..> UC3 : <<extend>>
 }
+
+' Зв'язки Читача
+Reader --> UC1
+Reader --> UC2
+Reader --> UC3
+Reader --> UC4
+Reader --> UC5
+Reader --> UC6
+
+' Зв'язки Автора
+Author --> UC7
+
+' Служба доставки сама ініціює взаємодію (push статусу доставки)
+DeliveryService --> UC4 : "Push статусу доставки"
 
 @enduml
