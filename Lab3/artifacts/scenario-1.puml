@@ -1,0 +1,94 @@
+@startuml
+title Scenario 1 — Online reservation payment (UC-03)
+skinparam sequenceMessageAlign center
+
+participant "User" as User
+participant "Frontend" as Frontend
+participant "Backend" as Backend
+participant "Database" as Database
+participant "Payment Gateway" as Gateway
+
+autonumber
+
+' 1) User chooses a reserved book, a delivery branch office and proceeds to payment
+User -> Frontend: open My Reservations page, choose book,\\nselect delivery branch office, click Proceed to payment
+activate Frontend
+
+' 2) Frontend submits delivery and payment data to the backend
+Frontend -> Backend: POST /api/v1/reservations/{reservation_id}/payment\\n{deliveryService, branchOffice, paymentMethod: ONLINE_CARD}
+
+' 3) Backend validates the reservation: status, expiry, cost (ReservationStatus, expires_at, rental_price)
+Backend -> Database: SELECT status, expires_at, rental_price\\nFROM reservations WHERE reservation_id = ?
+activate Backend
+activate Database
+
+alt Reservation.status == PENDING && now < expires_at
+  Database --> Backend: {status: PENDING, expiresAt, rentalPrice: amount}
+
+  ' 5) Backend persists delivery details (Delivery: service, branch_office, cost, status)
+  Backend -> Database: INSERT INTO deliveries (reservation_id, service, branch_office, cost, status)\\nVALUES (?, 'Nova Poshta', 'Branch #12', ?, 'PENDING')
+  Database --> Backend: {deliveryId}
+
+  ' 6) Backend asks the gateway to create a payment session (Payment: amount, method, external_transaction_id)
+  Backend -> Gateway: POST https://payments.dimpen.com/api/v1/sessions\\n{amount, reservation_id, returnUrl}
+  activate Gateway
+  Gateway --> Backend: {paymentSessionId, paymentUrl, external_transaction_id}
+  deactivate Gateway
+
+  ' 8) Backend returns the payment URL to the frontend
+  Backend --> Frontend: 200 OK {paymentUrl, orderNumber}
+  deactivate Backend
+
+  ' 9) Frontend redirects the user to the gateway payment page
+  Frontend -> User: HTTP 302 redirect to paymentUrl
+
+  ' 10) User enters card data and confirms on the gateway side
+  User -> Gateway: enter card number, expiry date, CVV; confirm payment
+  activate User
+
+  ' 11) Asynchronous webhook from the gateway with the payment result
+  Gateway -> Backend: POST /api/v1/webhooks/payment\\n{external_transaction_id, status}
+  activate Backend
+
+  alt PaymentStatus == PAID
+    ' 12) Backend updates the reservation status to PAID
+    Backend -> Database: UPDATE reservations SET status = 'PAID'\\nWHERE reservation_id = ?
+    activate Database
+    Database --> Backend: {rowsUpdated: 1}
+    deactivate Database
+    Backend --> Gateway: 200 OK webhook received
+    deactivate Backend
+  else PaymentStatus == FAILED
+    Backend -> Database: UPDATE reservations SET status = 'FAILED'\\nWHERE reservation_id = ?
+    activate Database
+    Database --> Backend: {rowsUpdated: 1}
+    deactivate Database
+    Backend --> Gateway: 200 OK
+    deactivate Backend
+  end
+
+  ' 13) Gateway sends the user back to the shop
+  Gateway -> User: HTTP 302 redirect to /orders/{order_number}/result
+
+  ' 14) Backend reads the final status from the database
+  Backend -> Database: SELECT status FROM reservations WHERE reservation_id = ?
+  activate Backend
+  activate Database
+  Database --> Backend: {status: PAID}
+  deactivate Database
+  Backend --> Frontend: GET /api/v1/reservations/{reservation_id}\\n→ {status: PAID, orderNumber, branchOffice}
+  deactivate Backend
+
+  ' 15) Frontend shows the success screen with order number and delivery branch office
+  Frontend -> User: display Payment successful — order #{order_number}, branch office: Branch #12
+else Reservation expired or not PENDING
+  Backend --> Frontend: 410 Gone {error: Reservation expired, bookCopy.status: AVAILABLE}
+  deactivate Backend
+  Frontend -> User: display Payment failed — reservation has expired
+end
+
+deactivate Frontend
+deactivate User
+deactivate Gateway
+
+@enduml
