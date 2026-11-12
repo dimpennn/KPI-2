@@ -1,33 +1,84 @@
 erDiagram
+    User ||--o{ Book : "додає"
     User ||--o{ Reservation : "створює"
     User ||--o{ Receipt : "отримує"
     User ||--o{ Review : "пише"
 
     Book ||--o{ BookCopy : "складається з"
-    Book ||--o{ Reservation : "запрошується в"
     Book ||--o{ Review : "отримує"
 
+    BookCopy ||--o{ Reservation : "бронюється в"
     BookCopy ||--o{ Receipt : "видається через"
+
+    Reservation ||--o| Delivery : "розширюється"
+    Reservation ||--o{ Payment : "оплачується через"
+    Reservation ||--o| Receipt : "підтверджується"
+
+    Payment ||--o| Receipt : "формує"
 
     User {
         UUIDv7 user_id PK
         string fullName
         string email
+        string password_hash
+        UserRole role
         timestamp registered_at
     }
 
     Book {
         UUIDv7 book_id PK
+        UUIDv7 author_id FK
         string title
         string author
         number total_pages
+        decimal rental_price
     }
 
     BookCopy {
         UUIDv7 copy_id PK
         UUIDv7 book_id FK
-        BookCopyCondition book_copy_condition
-        CopyStatus book_copy_status
+        BookCopyCondition condition
+        BookCopyStatus status
+    }
+
+    Reservation {
+        UUIDv7 reservation_id PK
+        UUIDv7 user_id FK
+        UUIDv7 copy_id FK
+        timestamp reserved_at
+        timestamp expires_at
+        ReservationStatus status
+    }
+
+    Delivery {
+        UUIDv7 delivery_id PK
+        UUIDv7 reservation_id FK
+        string service
+        string branch_office
+        string tracking_number
+        decimal cost
+        DeliveryStatus status
+        timestamp estimated_delivery_at
+    }
+
+    Payment {
+        UUIDv7 payment_id PK
+        UUIDv7 reservation_id FK
+        decimal amount
+        PaymentMethod method
+        PaymentStatus status
+        string external_transaction_id
+        timestamp created_at
+    }
+
+    Receipt {
+        UUIDv7 receipt_id PK
+        UUIDv7 reservation_id FK
+        UUIDv7 payment_id FK
+        UUIDv7 user_id FK
+        UUIDv7 copy_id FK
+        timestamp borrowed_at
+        timestamp due_date
     }
 
     Review {
@@ -37,21 +88,4 @@ erDiagram
         number rating
         string comment
         timestamp created_at
-    }
-
-    Receipt {
-        UUIDv7 receipt_id PK
-        UUIDv7 user_id FK
-        UUIDv7 copy_id FK
-        timestamp borrowed_at
-        timestamp due_date
-    }
-
-    Reservation {
-        UUIDv7 reservation_id PK
-        UUIDv7 user_id FK
-        UUIDv7 book_id FK
-        timestamp reserved_at
-        timestamp expires_at
-        ReservationStatus reservation_status
     }
