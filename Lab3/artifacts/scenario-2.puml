@@ -1,9 +1,10 @@
 @startuml
-title Scenario 2 — Cash or card payment at the physical cashier (UC-05)
+title Scenario 2 — Cash or terminal payment at cashier (UC-05)
 skinparam sequenceMessageAlign center
+hide footbox
 
-participant "User" as User
-participant "Cashier" as Cashier
+actor "User" as User
+actor "Cashier" as Cashier
 participant "Frontend" as Frontend
 participant "Backend" as Backend
 participant "Database" as Database
@@ -11,68 +12,51 @@ participant "Payment Terminal" as Terminal
 
 autonumber
 
-' 1) User approaches the cashier and names the reservation id
-User -> Cashier: provide reservation ID at the counter
+activate User
 activate Cashier
-
-' 2) Cashier enters the id in the frontend search
-Cashier -> Frontend: type reservation ID into POS search field
 activate Frontend
 
-' 3) Frontend asks the backend for the reservation data
+User -> Cashier: provide reservation ID at the counter
+Cashier -> Frontend: type reservation ID into POS search field
+
 Frontend -> Backend: GET /api/v1/reservations/{reservation_id}
-
-' 4) Backend queries the database, incl. the reserved physical book copy
-Backend -> Database: SELECT r.status, r.expires_at, c.copy_id, c.status, b.title\\nFROM reservations r\\nJOIN book_copies c ON c.copy_id = r.copy_id\\nJOIN books b ON b.book_id = c.book_id\\nWHERE r.reservation_id = ?
 activate Backend
+Backend -> Database: findReservation {reservation_id}
 activate Database
-Database --> Backend: {status: PENDING, copyId, title, copyStatus: RESERVED}
+Database --> Backend: {status: PENDING, copyId, title, copyStatus: RESERVED, amount}
+deactivate Database
+Backend --> Frontend: 200 OK {reservation, bookCopy, amount}
+deactivate Backend
 
-' 6) Backend returns the data; the cashier sees order details on the monitor
-Backend --> Frontend: 200 OK {reservation, bookCopy, user}
-Frontend -> Cashier: show order details on the monitor
+Frontend -> Cashier: show order details on POS monitor
+Cashier -> User: ask payment method: cash or card
 
-' 7) Cashier asks the user for the preferred payment method
-Cashier -> User: ask preferred payment method: cash or card
-
-alt Cash
-  ' 9) Cashier selects Cash on the interface and accepts money
-  Cashier -> Frontend: select Cash on the POS interface, accept cash from user
-  ' 10) Frontend calculates the change
-  Frontend -> User: calculate and display change due
-  ' 11) Cashier hands the change to the user
-  Cashier -> User: hand over change
-else Card
-  ' 9) Cashier selects Pay by card; frontend sends the amount to the terminal
-  Cashier -> Frontend: select Pay by card on the POS interface
-  Frontend -> Terminal: POST /api/v1/terminal/charge\\n{amount}
+alt Payment method == CASH
+  Cashier -> Frontend: select "Cash" on POS interface
+  Frontend -> Cashier: calculate and display change due
+  Cashier -> User: accept cash and hand over change
+else Payment method == CARD
+  Cashier -> Frontend: select "Pay by card" on POS interface
+  Frontend -> Terminal: POST /api/v1/terminal/charge {amount}
   activate Terminal
-  ' 10) User taps the card on the terminal
-  User -> Terminal: tap or insert card, enter PIN
-  ' 11) Terminal debits funds and returns the payment status
-  Terminal --> Frontend: payment status: APPROVED
+  User -> Terminal: tap card and enter PIN
+  Terminal --> Frontend: payment status: AUTHORIZED
   deactivate Terminal
 end
 
-' 12) Frontend sends the payment status to the backend
-Frontend -> Backend: POST /api/v1/payments\\n{reservation_id, method: CASH|CARD, amount, status: PAID}
+Frontend -> Backend: POST /api/v1/payments\n{reservation_id, method: CASH|POS_TERMINAL,\nstatus: AUTHORIZED, amount}
 activate Backend
-
-' 13) Backend sets the copy to IN_USE, writes the issue date and computes the return date
-Backend -> Database: UPDATE book_copies SET status = 'IN_USE',\\nborrowed_at = NOW(), due_date = NOW() + INTERVAL '14 days'\\nWHERE copy_id = ?
+Backend -> Database: recordPaymentAndIssueReceipt\n{Payment AUTHORIZED,\nReceipt {borrowed_at, due_date UTC},\nReservation FULFILLED, copy status IN_USE}
 activate Database
-Database --> Backend: {copyUpdated: 1, dueDate}
+Database --> Backend: {paymentId, receiptId, dueDate}
 deactivate Database
-
-' 14) Backend confirms the updated data
-Backend --> Frontend: 200 OK {copyId, status: IN_USE, dueDate}
+Backend --> Frontend: 200 OK {receiptId, dueDate}
 deactivate Backend
 
-' 15) Cashier hands the book copy to the user
 Frontend -> Cashier: print receipt with due date
-Cashier -> User: hand over the book copy and receipt
+Cashier -> User: hand over book copy and receipt
 
 deactivate Cashier
 deactivate Frontend
-
+deactivate User
 @enduml
