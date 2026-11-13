@@ -1,7 +1,6 @@
 @startuml
 title Scenario 2 — Cash or terminal payment at cashier (UC-05)
 skinparam sequenceMessageAlign center
-hide footbox
 
 actor "User" as User
 actor "Cashier" as Cashier
@@ -35,7 +34,7 @@ alt Payment method == CASH
   Cashier -> Frontend: select "Cash" on POS interface
   Frontend -> Cashier: calculate and display change due
   Cashier -> User: accept cash and hand over change
-else Payment method == CARD
+else Payment method == POS_TERMINAL
   Cashier -> Frontend: select "Pay by card" on POS interface
   Frontend -> Terminal: POST /api/v1/terminal/charge {amount}
   activate Terminal

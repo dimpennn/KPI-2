@@ -1,7 +1,6 @@
 @startuml
 title Scenario 1 — Online reservation payment (UC-03)
 skinparam sequenceMessageAlign center
-hide footbox
 
 actor "User" as User
 participant "Frontend" as Frontend
@@ -16,14 +15,15 @@ activate Frontend
 
 User -> Frontend: choose reserved book, select delivery branch,\nclick "Proceed to payment"
 Frontend -> Backend: POST /api/v1/reservations/{reservation_id}/payment\n{deliveryService, branchOffice, paymentMethod: ONLINE_GATEWAY}
+activate Backend
 
 Backend -> Database: fetchReservation {reservation_id}
 activate Database
 Database --> Backend: {status: PENDING, expiresAt, rentalPrice}
 deactivate Database
 
-alt Reservation.status == PENDING and now < expires_at
-  Backend -> Database: createDelivery {service, branchOffice, cost}
+alt Reservation.status == PENDING and nowUTC < expires_at
+  Backend -> Database: createDelivery {service, branchOffice, cost, status: PENDING}
   activate Database
   Database --> Backend: {deliveryId}
   deactivate Database
@@ -33,44 +33,50 @@ alt Reservation.status == PENDING and now < expires_at
   Gateway --> Backend: {paymentUrl, external_transaction_id}
   deactivate Gateway
 
+  Backend -> Database: createPayment {reservation_id, amount,\nmethod: ONLINE_GATEWAY, status: PENDING, external_transaction_id}
+  activate Database
+  Database --> Backend: {paymentId}
+  deactivate Database
+
   Backend --> Frontend: 200 OK {paymentUrl, orderNumber: reservation_id}
   deactivate Backend
 
   Frontend -> User: HTTP 302 redirect to paymentUrl
 
   User -> Gateway: enter card details and confirm payment
-  activate Backend
+  activate Gateway
   Gateway -> Backend: webhook POST /api/v1/webhooks/payment\n{external_transaction_id, status}
+  activate Backend
 
   alt Payment.status == AUTHORIZED
-    Backend -> Database: finalizeReservation\n{Payment ONLINE_GATEWAY/AUTHORIZED,\nReceipt {borrowed_at, due_date}, copy status IN_USE}
+    Backend -> Database: finalizeReservation\n{Payment ONLINE_GATEWAY/AUTHORIZED, Reservation PAID,\nReceipt {borrowed_at, due_date UTC}, copy status IN_USE}
     activate Database
     Database --> Backend: {paymentId, receiptId}
     deactivate Database
-    Backend --> Gateway: 200 OK
-    deactivate Backend
   else Payment.status != AUTHORIZED
-    Backend -> Database: markPaymentFailed {paymentId}
+    Backend -> Database: markPaymentFailed {paymentId, status: FAILED}
     activate Database
     Database --> Backend: {rowsUpdated}
     deactivate Database
-    Backend --> Gateway: 200 OK
-    deactivate Backend
   end
 
+  Backend --> Gateway: 200 OK
+  deactivate Backend
+
   Gateway -> User: HTTP 302 redirect to /orders/{reservation_id}/result
+  deactivate Gateway
 
   Frontend -> Backend: GET /api/v1/reservations/{reservation_id}
   activate Backend
   Backend -> Database: fetchReservation {reservation_id}
   activate Database
-  Database --> Backend: {status: FULFILLED, orderNumber, branchOffice}
+  Database --> Backend: {status: PAID, orderNumber, branchOffice}
   deactivate Database
-  Backend --> Frontend: 200 OK {status: FULFILLED, orderNumber, branchOffice}
+  Backend --> Frontend: 200 OK {status: PAID, orderNumber, branchOffice}
   deactivate Backend
 
   Frontend -> User: display "Payment successful — order #{reservation_id}, branch office"
-else
+else Reservation expired or not PENDING
   Backend -> Database: expireReservation {Reservation EXPIRED, copy status AVAILABLE}
   activate Database
   Database --> Backend: {reservationExpired}
