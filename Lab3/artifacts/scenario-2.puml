@@ -1,0 +1,61 @@
+@startuml
+title Scenario 2 — Cash or terminal payment at cashier (UC-05)
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+actor "Cashier" as Cashier
+participant "Frontend" as Frontend
+participant "Backend" as Backend
+participant "Database" as Database
+participant "Payment Terminal" as Terminal
+
+autonumber
+
+activate User
+activate Cashier
+activate Frontend
+
+User -> Cashier: provide reservation ID at the counter
+Cashier -> Frontend: type reservation ID into POS search field
+
+Frontend -> Backend: GET /api/v1/reservations/{reservation_id}
+activate Backend
+Backend -> Database: findReservation {reservation_id}
+activate Database
+Database --> Backend: {status: PENDING, copyId, title, copyStatus: RESERVED, amount, version}
+deactivate Database
+Backend --> Frontend: 200 OK {reservation, bookCopy, amount}
+deactivate Backend
+
+Frontend -> Cashier: show order details on POS monitor
+Cashier -> User: ask payment method: cash or card
+
+alt Payment method == CASH
+  Cashier -> Frontend: select "Cash" on POS interface
+  Frontend -> Cashier: calculate and display change due
+  Cashier -> User: accept cash and hand over change
+else Payment method == POS_TERMINAL
+  Cashier -> Frontend: select "Pay by card" on POS interface
+  Frontend -> Terminal: POST /api/v1/terminal/charge {amount}
+  activate Terminal
+  User -> Terminal: tap card and enter PIN
+  Terminal --> Frontend: payment status: AUTHORIZED
+  deactivate Terminal
+end
+
+Frontend -> Backend: POST /api/v1/payments\n{reservation_id, method: CASH|POS_TERMINAL,\nstatus: AUTHORIZED, amount}
+activate Backend
+Backend -> Database: recordPaymentAndIssueReceipt\n{version, Payment AUTHORIZED,\nReceipt {borrowed_at, due_date UTC},\nReservation FULFILLED, copy status IN_USE}
+activate Database
+Database --> Backend: {paymentId, receiptId, dueDate}
+deactivate Database
+Backend --> Frontend: 200 OK {receiptId, dueDate}
+deactivate Backend
+
+Frontend -> Cashier: print receipt with due date
+Cashier -> User: hand over book copy and receipt
+
+deactivate Cashier
+deactivate Frontend
+deactivate User
+@enduml

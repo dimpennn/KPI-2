@@ -1,0 +1,108 @@
+@startuml
+title Scenario 1 — Online reservation payment (UC-03)
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Frontend" as Frontend
+participant "Backend" as Backend
+participant "Database" as Database
+participant "Payment Gateway" as Gateway
+
+autonumber
+
+activate User
+activate Frontend
+
+User -> Frontend: choose reserved book, select delivery branch,\nclick "Proceed to payment"
+Frontend -> Backend: POST /api/v1/reservations/{reservation_id}/payment\n{deliveryService, branchOffice, paymentMethod: ONLINE_GATEWAY}
+activate Backend
+
+Backend -> Database: fetchReservation {reservation_id}
+activate Database
+Database --> Backend: {status: PENDING, expiresAt, rentalPrice, version}
+deactivate Database
+
+alt Reservation.status == PENDING and nowUTC < expires_at
+  Backend -> Database: createDelivery {service, branchOffice, cost, status: PENDING}
+  activate Database
+  Database --> Backend: {deliveryId}
+  deactivate Database
+
+  Backend -> Gateway: POST /api/v1/payments/sessions\n{amount, reservation_id, returnUrl}
+  activate Gateway
+  Gateway --> Backend: {paymentUrl, external_transaction_id}
+  deactivate Gateway
+
+  Backend -> Database: createPayment {reservation_id, amount,\nmethod: ONLINE_GATEWAY, status: PENDING, external_transaction_id, graceExpiresAt = expires_at + 5m UTC}
+  activate Database
+  Database --> Backend: {paymentId}
+  deactivate Database
+
+  Backend --> Frontend: 200 OK {paymentUrl, orderNumber: reservation_id}
+  deactivate Backend
+
+  Frontend -> User: HTTP 302 redirect to paymentUrl
+
+  User -> Gateway: enter card details and confirm payment
+  activate Gateway
+  Gateway -> Backend: webhook POST /api/v1/webhooks/payment\n{external_transaction_id, status}
+  activate Backend
+
+  Backend -> Database: fetchPaymentAndReservation {external_transaction_id}
+  activate Database
+  Database --> Backend: {paymentId, reservation_id, graceExpiresAt, version}
+  deactivate Database
+
+  alt Payment.status == AUTHORIZED
+    alt nowUTC <= graceExpiresAt
+      Backend -> Database: finalizeReservation {version, Payment ONLINE_GATEWAY/AUTHORIZED, Reservation PAID,\nReceipt {borrowed_at, due_date UTC}, copy status IN_USE}
+      activate Database
+      Database --> Backend: {paymentId, receiptId}
+      deactivate Database
+    else Grace period expired or version conflict
+      Backend -> Gateway: POST /api/v1/payments/refund {external_transaction_id}
+      activate Gateway
+      Gateway --> Backend: {refundStatus: REFUNDED}
+      deactivate Gateway
+
+      Backend -> Database: markPaymentRefundedAndExpire {paymentId, version,\nPayment REFUNDED, Reservation EXPIRED, copy status AVAILABLE}
+      activate Database
+      Database --> Backend: {rowsUpdated}
+      deactivate Database
+    end
+  else Payment.status != AUTHORIZED
+    Backend -> Database: markPaymentFailed {paymentId, status: FAILED}
+    activate Database
+    Database --> Backend: {rowsUpdated}
+    deactivate Database
+  end
+
+  Backend --> Gateway: 200 OK
+  deactivate Backend
+
+  Gateway -> User: HTTP 302 redirect to /orders/{reservation_id}/result
+  deactivate Gateway
+
+  Frontend -> Backend: GET /api/v1/reservations/{reservation_id}
+  activate Backend
+  Backend -> Database: fetchReservation {reservation_id}
+  activate Database
+  Database --> Backend: {status: PAID, orderNumber, branchOffice, version}
+  deactivate Database
+  Backend --> Frontend: 200 OK {status: PAID, orderNumber, branchOffice}
+  deactivate Backend
+
+  Frontend -> User: display "Payment successful — order #{reservation_id}, branch office"
+else Reservation expired or not PENDING
+  Backend -> Database: expireReservation {version, Reservation EXPIRED, copy status AVAILABLE}
+  activate Database
+  Database --> Backend: {reservationExpired}
+  deactivate Database
+  Backend --> Frontend: 410 Gone {error: Reservation expired}
+  deactivate Backend
+  Frontend -> User: display "Payment failed — reservation has expired"
+end
+
+deactivate Frontend
+deactivate User
+@enduml
