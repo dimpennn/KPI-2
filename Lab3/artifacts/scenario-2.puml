@@ -22,7 +22,7 @@ Frontend -> Backend: GET /api/v1/reservations/{reservation_id}
 activate Backend
 Backend -> Database: findReservation {reservation_id}
 activate Database
-Database --> Backend: {status: PENDING, copyId, title, copyStatus: RESERVED, amount}
+Database --> Backend: {status: PENDING, copyId, title, copyStatus: RESERVED, amount, version}
 deactivate Database
 Backend --> Frontend: 200 OK {reservation, bookCopy, amount}
 deactivate Backend
@@ -45,7 +45,7 @@ end
 
 Frontend -> Backend: POST /api/v1/payments\n{reservation_id, method: CASH|POS_TERMINAL,\nstatus: AUTHORIZED, amount}
 activate Backend
-Backend -> Database: recordPaymentAndIssueReceipt\n{Payment AUTHORIZED,\nReceipt {borrowed_at, due_date UTC},\nReservation FULFILLED, copy status IN_USE}
+Backend -> Database: recordPaymentAndIssueReceipt\n{version, Payment AUTHORIZED,\nReceipt {borrowed_at, due_date UTC},\nReservation FULFILLED, copy status IN_USE}
 activate Database
 Database --> Backend: {paymentId, receiptId, dueDate}
 deactivate Database

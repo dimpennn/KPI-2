@@ -19,7 +19,7 @@ activate Backend
 
 Backend -> Database: fetchReservation {reservation_id}
 activate Database
-Database --> Backend: {status: PENDING, expiresAt, rentalPrice}
+Database --> Backend: {status: PENDING, expiresAt, rentalPrice, version}
 deactivate Database
 
 alt Reservation.status == PENDING and nowUTC < expires_at
@@ -33,7 +33,7 @@ alt Reservation.status == PENDING and nowUTC < expires_at
   Gateway --> Backend: {paymentUrl, external_transaction_id}
   deactivate Gateway
 
-  Backend -> Database: createPayment {reservation_id, amount,\nmethod: ONLINE_GATEWAY, status: PENDING, external_transaction_id}
+  Backend -> Database: createPayment {reservation_id, amount,\nmethod: ONLINE_GATEWAY, status: PENDING, external_transaction_id, graceExpiresAt = expires_at + 5m UTC}
   activate Database
   Database --> Backend: {paymentId}
   deactivate Database
@@ -48,11 +48,28 @@ alt Reservation.status == PENDING and nowUTC < expires_at
   Gateway -> Backend: webhook POST /api/v1/webhooks/payment\n{external_transaction_id, status}
   activate Backend
 
+  Backend -> Database: fetchPaymentAndReservation {external_transaction_id}
+  activate Database
+  Database --> Backend: {paymentId, reservation_id, graceExpiresAt, version}
+  deactivate Database
+
   alt Payment.status == AUTHORIZED
-    Backend -> Database: finalizeReservation\n{Payment ONLINE_GATEWAY/AUTHORIZED, Reservation PAID,\nReceipt {borrowed_at, due_date UTC}, copy status IN_USE}
-    activate Database
-    Database --> Backend: {paymentId, receiptId}
-    deactivate Database
+    alt nowUTC <= graceExpiresAt
+      Backend -> Database: finalizeReservation {version, Payment ONLINE_GATEWAY/AUTHORIZED, Reservation PAID,\nReceipt {borrowed_at, due_date UTC}, copy status IN_USE}
+      activate Database
+      Database --> Backend: {paymentId, receiptId}
+      deactivate Database
+    else Grace period expired or version conflict
+      Backend -> Gateway: POST /api/v1/payments/refund {external_transaction_id}
+      activate Gateway
+      Gateway --> Backend: {refundStatus: REFUNDED}
+      deactivate Gateway
+
+      Backend -> Database: markPaymentRefundedAndExpire {paymentId, version,\nPayment REFUNDED, Reservation EXPIRED, copy status AVAILABLE}
+      activate Database
+      Database --> Backend: {rowsUpdated}
+      deactivate Database
+    end
   else Payment.status != AUTHORIZED
     Backend -> Database: markPaymentFailed {paymentId, status: FAILED}
     activate Database
@@ -70,14 +87,14 @@ alt Reservation.status == PENDING and nowUTC < expires_at
   activate Backend
   Backend -> Database: fetchReservation {reservation_id}
   activate Database
-  Database --> Backend: {status: PAID, orderNumber, branchOffice}
+  Database --> Backend: {status: PAID, orderNumber, branchOffice, version}
   deactivate Database
   Backend --> Frontend: 200 OK {status: PAID, orderNumber, branchOffice}
   deactivate Backend
 
   Frontend -> User: display "Payment successful — order #{reservation_id}, branch office"
 else Reservation expired or not PENDING
-  Backend -> Database: expireReservation {Reservation EXPIRED, copy status AVAILABLE}
+  Backend -> Database: expireReservation {version, Reservation EXPIRED, copy status AVAILABLE}
   activate Database
   Database --> Backend: {reservationExpired}
   deactivate Database
